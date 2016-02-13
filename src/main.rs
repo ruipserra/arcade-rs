@@ -1,9 +1,23 @@
 extern crate sdl2;
 
+// #[macro_use] here is telling the compiler to import the macros defined
+// in the events module.
+#[macro_use]
 mod events;
 
-use events::Events;
 use sdl2::pixels::Color;
+
+struct_events! {
+    keyboard: {
+        key_escape: Escape,
+        key_up: Up,
+        key_down: Down
+    },
+
+    else: {
+        quit: Quit { .. }
+    }
+}
 
 fn main() {
     // Initizalize SDL2
@@ -27,7 +41,7 @@ fn main() {
     loop {
         events.pump();
 
-        if events.quit || events.key_escape {
+        if events.now.key_escape == Some(true) || events.now.quit {
             break;
         }
 
