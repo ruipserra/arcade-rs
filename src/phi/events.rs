@@ -8,16 +8,18 @@ macro_rules! struct_events {
 
         pub struct ImmediateEvents {
             $( pub $k_alias: Option<bool>, )*
-
             $( pub $e_alias: bool, )*
+
+            resize: Option<(u32, u32)>,
         }
 
         impl ImmediateEvents {
             pub fn new() -> ImmediateEvents {
                 ImmediateEvents {
                     $( $k_alias: None, )*
-
                     $( $e_alias: false, )*
+
+                    resize: None,
                 }
             }
         }
@@ -26,7 +28,7 @@ macro_rules! struct_events {
             pump: EventPump,
             pub now: ImmediateEvents,
 
-            $( $k_alias: bool ),*
+            $( pub $k_alias: bool ),*
         }
 
         impl Events {
@@ -39,14 +41,19 @@ macro_rules! struct_events {
                 }
             }
 
-            pub fn pump(&mut self) {
+            pub fn pump(&mut self, renderer: &mut ::sdl2::render::Renderer) {
                 self.now = ImmediateEvents::new();
 
                 for event in self.pump.poll_iter() {
                     use sdl2::event::Event::*;
+                    use sdl2::event::WindowEventId::Resized;
                     use sdl2::keyboard::Keycode::*;
 
                     match event {
+                        Window { win_event_id: Resized, .. } => {
+                            self.now.resize = Some(renderer.output_size().unwrap());
+                        },
+
                         KeyDown { keycode, .. } => match keycode {
                             $(
                                 Some($k_sdl) => {

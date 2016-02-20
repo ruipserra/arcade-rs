@@ -1,5 +1,6 @@
 #[macro_use]
 mod events;
+pub mod data;
 
 use sdl2::render::Renderer;
 use sdl2::pixels::Color;
@@ -9,6 +10,8 @@ struct_events! {
         key_escape: Escape,
         key_up: Up,
         key_down: Down,
+        key_left: Left,
+        key_right: Right,
         key_space: Space
     },
 
@@ -20,6 +23,13 @@ struct_events! {
 pub struct Phi<'window> {
     pub events: Events,
     pub renderer: Renderer<'window>,
+}
+
+impl<'window> Phi<'window> {
+    pub fn output_size(&self) -> (f64, f64) {
+        let (w, h): (u32, u32) = self.renderer.output_size().unwrap();
+        (w as f64, h as f64)
+    }
 }
 
 /// `ViewAction` allows the current view to tell the render loop what shpuld
@@ -74,6 +84,7 @@ pub fn spawn<F>(title: &str, init: F)
     let window = video.window("ArcadeRS Shooter", 800, 600)
         .position_centered()
         .opengl()
+        .resizable()
         .build()
         .unwrap();
 
@@ -110,7 +121,7 @@ pub fn spawn<F>(title: &str, init: F)
             fps = 0;
         }
 
-        context.events.pump();
+        context.events.pump(&mut context.renderer);
 
         match current_view.render(&mut context, 0.01) {
             ViewAction::None => context.renderer.present(),
