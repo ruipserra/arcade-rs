@@ -5,3 +5,4 @@ authors = ["Rui Serra <ruipserra@gmail.com>"]
 
 [dependencies]
 sdl2 = "0.13"
+sdl2_image = "1.0.0"
