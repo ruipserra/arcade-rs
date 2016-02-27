@@ -2,6 +2,7 @@ use phi::{Phi, View, ViewAction};
 use phi::data::Rectangle;
 use phi::gfx::{Sprite, CopySprite};
 use sdl2::pixels::Color;
+use sdl2::render::Renderer;
 
 /// Pixels traveled by the player's ship every second, when it's moving
 const PLAYER_SPEED: f64 = 180.0;
@@ -9,6 +10,7 @@ const PLAYER_SPEED: f64 = 180.0;
 const SHIP_W: f64 = 43.0;
 const SHIP_H: f64 = 39.0;
 
+const DEBUG: bool = false;
 /// The different states our ship can be in. In the image, they're ordered
 /// from left to right, top to bottom.
 #[derive(Copy, Clone)]
@@ -30,9 +32,50 @@ struct Ship {
     current: ShipFrame,
 }
 
+#[derive(Clone)]
+struct Background {
+    pos: f64,
+    /// The amount of pixels moved to the left every second
+    vel: f64,
+    sprite: Sprite,
+}
+
+impl Background {
+    fn render(&mut self, renderer: &mut Renderer, elapsed: f64) {
+        // We define the logical position as depending solely on the time and
+        // the dimensions of the image, not on the screen's size
+        let size = self.sprite.size();
+        self.pos += self.vel * elapsed;
+        if self.pos > size.0 {
+            self.pos -= size.0;
+        }
+
+        // We determine the scale ratio of the image to the sprite
+        let (win_w, win_h) = renderer.output_size().unwrap();
+        let scale = win_h as f64 / size.1;
+
+        let mut physical_left = -self.pos * scale;
+
+        while physical_left < win_w as f64 {
+            // while the left of the image is still inside the window...
+            renderer.copy_sprite(&self.sprite, Rectangle {
+                x: physical_left,
+                y: 0.0,
+                w: size.0 * scale,
+                h: win_h as f64,
+            });
+
+            physical_left += size.0 * scale;
+        }
+    }
+}
 
 pub struct ShipView {
     player: Ship,
+
+    bg_back: Background,
+    bg_middle: Background,
+    bg_front: Background,
 }
 
 impl ShipView {
@@ -63,7 +106,25 @@ impl ShipView {
 
                 sprites: sprites,
                 current: ShipFrame::MidNorm,
-            }
+            },
+
+            bg_back: Background {
+                pos: 0.0,
+                vel: 20.0,
+                sprite: Sprite::load(&phi.renderer, "assets/starBG.png").unwrap(),
+            },
+
+            bg_middle: Background {
+                pos: 0.0,
+                vel: 20.0,
+                sprite: Sprite::load(&phi.renderer, "assets/starMG.png").unwrap(),
+            },
+
+            bg_front: Background {
+                pos: 0.0,
+                vel: 20.0,
+                sprite: Sprite::load(&phi.renderer, "assets/starFG.png").unwrap(),
+            },
         }
     }
 }
@@ -129,15 +190,24 @@ impl View for ShipView {
         phi.renderer.set_draw_color(Color::RGB(0, 0, 0));
         phi.renderer.clear();
 
+        // Render the Background
+        self.bg_back.render(&mut phi.renderer, elapsed);
+        self.bg_middle.render(&mut phi.renderer, elapsed);
+
         // Render the bounding box (for debugging)
-        // phi.renderer.set_draw_color(Color::RGB(200, 200, 50));
-        // phi.renderer.fill_rect(self.player.rect.to_sdl().unwrap());
+        if DEBUG {
+            phi.renderer.set_draw_color(Color::RGB(200, 200, 50));
+            phi.renderer.fill_rect(self.player.rect.to_sdl().unwrap());
+        }
 
         // Render the ship texture
         phi.renderer.copy_sprite(
             &self.player.sprites[self.player.current as usize],
             self.player.rect,
         );
+
+        // Render the front Background
+        self.bg_middle.render(&mut phi.renderer, elapsed);
 
         ViewAction::None
     }
