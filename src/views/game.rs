@@ -1,6 +1,6 @@
 use phi::{Phi, View, ViewAction};
 use phi::data::Rectangle;
-use phi::gfx::{Sprite, CopySprite};
+use phi::gfx::{Sprite, AnimatedSprite, CopySprite};
 use sdl2::pixels::Color;
 use sdl2::render::Renderer;
 use views::shared::Background;
@@ -12,6 +12,7 @@ const SHIP_W: f64 = 43.0;
 const SHIP_H: f64 = 39.0;
 
 const DEBUG: bool = false;
+
 /// The different states our ship can be in. In the image, they're ordered
 /// from left to right, top to bottom.
 #[derive(Copy, Clone)]
@@ -35,6 +36,8 @@ struct Ship {
 
 pub struct ShipView {
     player: Ship,
+
+    asteroid: Asteroid,
 
     bg_back: Background,
     bg_middle: Background,
@@ -70,6 +73,8 @@ impl ShipView {
                 sprites: sprites,
                 current: ShipFrame::MidNorm,
             },
+
+            asteroid: Asteroid::new(phi),
 
             bg_back: Background {
                 pos: 0.0,
@@ -149,6 +154,10 @@ impl View for ShipView {
 
         self.player.rect = self.player.rect.move_inside(movable_region).unwrap();
 
+
+        // Update the asteroid
+        self.asteroid.update(phi, elapsed);
+
         // Clear the screen
         phi.renderer.set_draw_color(Color::RGB(0, 0, 0));
         phi.renderer.clear();
@@ -169,9 +178,98 @@ impl View for ShipView {
             self.player.rect,
         );
 
+        // Render the asteroid
+        self.asteroid.render(phi);
+
         // Render the front Background
         self.bg_middle.render(&mut phi.renderer, elapsed);
 
         ViewAction::None
+    }
+}
+
+
+const ASTEROID_PATH: &'static str = "assets/asteroid.png";
+const ASTEROIDS_WIDE: usize = 21;
+const ASTEROIDS_HIGH: usize = 7;
+const ASTEROIDS_TOTAL: usize = ASTEROIDS_WIDE * ASTEROIDS_HIGH - 4;
+const ASTEROIDS_SIDE: f64 = 96.0;
+
+struct Asteroid {
+    sprite: AnimatedSprite,
+    rect: Rectangle,
+    vel: f64,
+}
+
+impl Asteroid {
+    fn new(phi: &mut Phi) -> Asteroid {
+        let mut asteroid = Asteroid {
+            sprite: Asteroid::get_sprite(phi, 15.0),
+            rect: Rectangle {
+                x: 128.0,
+                y: 128.0,
+                w: ASTEROIDS_SIDE,
+                h: ASTEROIDS_SIDE,
+            },
+            vel: 0.0,
+        };
+
+        asteroid.reset(phi);
+        asteroid
+    }
+
+    fn update(&mut self, phi: &mut Phi, dt: f64) {
+        self.rect.x -= dt * self.vel;
+        self.sprite.add_time(dt);
+
+        if self.rect.x <= -ASTEROIDS_SIDE {
+            self.reset(phi);
+        }
+    }
+
+    fn render(&self, phi: &mut Phi) {
+        phi.renderer.copy_sprite(&self.sprite, self.rect);
+    }
+
+    fn reset(&mut self, phi: &mut Phi) {
+        let (w, h) = phi.output_size();
+
+        // FPS between 10.0 and 30.0
+        self.sprite.set_fps(::rand::random::<f64>().abs() * 20.0 + 10.0);
+
+        self.rect = Rectangle {
+            x: w,
+            y: ::rand::random::<f64>().abs() * (h - ASTEROIDS_SIDE),
+            w: ASTEROIDS_SIDE,
+            h: ASTEROIDS_SIDE,
+        };
+
+        // vel between 50.0 and 150.0
+        self.vel = ::rand::random::<f64>().abs() * 100.0 + 50.0;
+    }
+
+    fn get_sprite(phi: &mut Phi, fps: f64) -> AnimatedSprite {
+        let asteroid_spritesheet = Sprite::load(&mut phi.renderer, ASTEROID_PATH).unwrap();
+        let mut asteroid_sprites = Vec::with_capacity(ASTEROIDS_TOTAL);
+
+        for yth in 0..ASTEROIDS_HIGH {
+            for xth in 0..ASTEROIDS_WIDE {
+                // There are four asteroids missing at the end of the sprite. We don't want those.
+                if ASTEROIDS_WIDE * yth + xth >= ASTEROIDS_TOTAL {
+                    break;
+                }
+
+                asteroid_sprites.push(
+                    asteroid_spritesheet.region(Rectangle {
+                        x: xth as f64 * ASTEROIDS_SIDE,
+                        y: yth as f64 * ASTEROIDS_SIDE,
+                        w: ASTEROIDS_SIDE,
+                        h: ASTEROIDS_SIDE,
+                    }).unwrap()
+                );
+            }
+        }
+
+        AnimatedSprite::with_fps(asteroid_sprites, fps)
     }
 }
